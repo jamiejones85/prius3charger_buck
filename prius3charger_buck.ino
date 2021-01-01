@@ -131,6 +131,7 @@ Connections:
 #define BMS_MAX_CELL_MV_FOR_FAIL 4220
 #define BMS_MAX_TEMPREATURE_C_FOR_FAIL 45
 #define BOOST_MAX_TEMPERATURE_C 70
+#define CHARGE_FINISH_AT_A 4
 
 // Some secondary values that can be automatically set
 #define BATTERY_MINIMUM_VOLTAGE (BATTERY_CHARGE_VOLTAGE / 2)
@@ -149,7 +150,7 @@ Connections:
 #define DCBUS1_V_PER_BIT 0.438*/
 // Not sure what's up with this, maybe my Prius gen3 inverter is a bit wonky
 #define DCBUS1_OFFSET_BITS 74
-#define DCBUS1_V_PER_BIT 0.560
+#define DCBUS1_V_PER_BIT 0.551
 
 // This is what it should be
 #define MG1_CURRENT_A_PER_BIT 1.0
@@ -343,6 +344,7 @@ struct ChargerStatus
 	unsigned long no_start_condition_timestamp = 0;
 	unsigned long start_timestamp = 0;
 	unsigned long precharge_start_timestamp = 0;
+	unsigned long charge_not_looking_complete_timestamp = 0;
 	unsigned long stopping_charge_start_timestamp = 0;
 	unsigned long fail_timestamp = 0;
 	unsigned long allow_measurement_start_timestamp = 0;
@@ -971,26 +973,32 @@ void handle_charger_state()
 		if(CANBUS_ENABLE){
 			if(canbus_status.charge_completed){
 				report_status_on_console();
-				log_println_f("BMS reports charge completion");
+				log_println_f("BMS reports charge completion, stopping");
 				charger_state = CS_STOPPING_CHARGE;
 				charger.stopping_charge_start_timestamp = millis();
 				return;
 			}
 		}
 
-		if(output_voltage_V >= BATTERY_CHARGE_VOLTAGE - 2 &&
-				output_dc_current_Ax10 < 5){
-			if(timestamp_younger_than(charger.start_timestamp, 30000)){
-				EVERY_N_MILLISECONDS(5000){
-					log_println_f("... Charging looks complete but continuing (ignoring BMS)");
-				}
-			} else {
+		bool charge_looks_momentarily_complete =
+				output_voltage_V >= BATTERY_CHARGE_VOLTAGE - 2 &&
+				output_dc_current_Ax10 <= (CHARGE_FINISH_AT_A * 10);
+
+		if(charge_looks_momentarily_complete){
+			if(charger.charge_not_looking_complete_timestamp != 0 &&
+					timestamp_age(charger.charge_not_looking_complete_timestamp) >= 30000){
 				report_status_on_console();
-				log_println_f("Charging looks complete, stopping (ignoring BMS)");
+				log_println_f("Charge looks complete, stopping");
 				charger_state = CS_STOPPING_CHARGE;
 				charger.stopping_charge_start_timestamp = millis();
 				return;
+			} else {
+				EVERY_N_MILLISECONDS(5000){
+					log_println_f("... Charge looks momentarily complete, waiting");
+				}
 			}
+		} else {
+			charger.charge_not_looking_complete_timestamp = millis();
 		}
 
 		// Update output according to vehicle requirements
@@ -1217,11 +1225,7 @@ static int16_t get_max_input_a()
 		if(force_ac_input_amps != 0)
 			return force_ac_input_amps;
 		// Otherwise use EVSE CP PWM limit
-		// De-rate to be sure to not potentially pull too much current from a
-		// public charge point. That would be rude!
-		// For some reason a 16A fuse opened when I was charging at what the
-		// code thought was 12A, so we'll de-rate the EVSE value by 25%.
-		return evse_allowed_amps - evse_allowed_amps / 4;
+		return evse_allowed_amps;
 	}();
 
 	// Cable limit (EVSE PP resistor)
@@ -1244,7 +1248,10 @@ static void control_buck()
 	int16_t max_input_a = get_max_input_a();
 
 	// Calibrated input peak A = 2.0 * input RMS A (at around 10kW)
-	int16_t max_input_dc_current_Ax10 = max_input_a * 20;
+	// Well, except that 2.0 will slowly blow a C32 fuse when input current is
+	// set at 32A.
+	// Let's randomly use 1.5, maybe it's good.
+	int16_t max_input_dc_current_Ax10 = max_input_a * 15;
 
 	if(
 		output_dc_current_Ax10 >= wanted_output_current * 20
