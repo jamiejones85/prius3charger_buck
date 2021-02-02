@@ -140,18 +140,11 @@ Connections:
 // Scaling of analog inputs
 // NOTE: DCBUS2 is buck high side = MG side = 3-phase AC input side
 // NOTE: DCBUS1 is buck low side = battery side
-#define DCBUS2_OFFSET_BITS 0
-#define DCBUS2_V_PER_BIT 1.234
+
 /*#define DCBUS1_OFFSET_BITS 0
 #define DCBUS1_V_PER_BIT 0.438*/
 // Not sure what's up with this, maybe my Prius gen3 inverter is a bit wonky
-#define DCBUS1_OFFSET_BITS 74
-#define DCBUS1_V_PER_BIT 0.560
 
-// This is what it should be
-#define MG1_CURRENT_A_PER_BIT 1.0
-// This is what you need with wrong resistors on Yaris inverter
-//#define MG1_CURRENT_A_PER_BIT 0.735
 
 #define PWM_HANDLER_INTERVAL (uint8_t)(PWM_FREQ / 3400 + 1)
 
@@ -773,7 +766,7 @@ void handle_charger_state()
 
 
 			charger.precharge_start_timestamp = millis();
-			charger.precharge_last_input_voltage = dcbus2_raw * DCBUS2_V_PER_BIT;
+			charger.precharge_last_input_voltage = dcbus2_raw * chargerConfig.dc2_volt_per_bit;
 
 			report_status_on_console();
 
@@ -1129,7 +1122,7 @@ void set_wanted_output_V_A_pwm(int16_t voltage_V, int16_t current_A, int16_t pwm
 void check_and_react_if_high_power_input_failed()
 {
 	cli();
-	int16_t voltage_now = dcbus2_raw * DCBUS2_V_PER_BIT;
+	int16_t voltage_now = dcbus2_raw * chargerConfig.dc2_volt_per_bit;
 	sei();
 
 	EVERY_N_MILLISECONDS(1000){
@@ -1334,10 +1327,10 @@ static void control_buck()
 		current_pwm = ICR1;
 
 	disable_pwm = [&](){
-		if(dcbus1_raw >= (int16_t)(OUTPUT_VOLTAGE_MAX_V / DCBUS1_V_PER_BIT)){
+		if(dcbus1_raw >= (int16_t)(OUTPUT_VOLTAGE_MAX_V / chargerConfig.dc1_volt_per_bit)){
 			return DPR_DCBUS1_OVERVOLTAGE;
 		}
-		if(dcbus2_raw >= (int16_t)(INPUT_VOLTAGE_MAX_V / DCBUS2_V_PER_BIT)){
+		if(dcbus2_raw >= (int16_t)(INPUT_VOLTAGE_MAX_V / chargerConfig.dc2_volt_per_bit)){
 			return DPR_DCBUS2_OVERVOLTAGE;
 		}
 		if(wanted_pwm == 0){
@@ -1421,12 +1414,12 @@ SIGNAL(TIMER1_CAPT_vect)
 	ch_i++;
 	switch(ch_i){
 	case 0:
-		dcbus1_raw = analogRead(DCBUS1_PIN) - DCBUS1_OFFSET_BITS;
-		output_voltage_V = ((int32_t)dcbus1_raw * (int32_t)(DCBUS1_V_PER_BIT*1000)) / 1000;
+		dcbus1_raw = analogRead(DCBUS1_PIN) - chargerConfig.dc1_volt_offset;
+		output_voltage_V = ((int32_t)dcbus1_raw * (int32_t)(chargerConfig.dc1_volt_per_bit*1000)) / 1000;
 		break;
 	case 1:
-		dcbus2_raw = analogRead(DCBUS2_PIN) - DCBUS2_OFFSET_BITS;
-		input_voltage_V = ((int32_t)dcbus2_raw * (int32_t)(DCBUS2_V_PER_BIT*1000)) / 1000;
+		dcbus2_raw = analogRead(DCBUS2_PIN) - chargerConfig.dc2_volt_offset;
+		input_voltage_V = ((int32_t)dcbus2_raw * (int32_t)(chargerConfig.dc2_volt_per_bit*1000)) / 1000;
 		break;
 	case 2:
 		mg2l1_current_raw = analogRead(MG1_L1_CURRENT_PIN) -
@@ -1454,9 +1447,9 @@ SIGNAL(TIMER1_CAPT_vect)
 		// Control PWM
 
 		int16_t l1_current_A =
-				abs(((int32_t)mg2l1_current_raw * (int32_t)(MG1_CURRENT_A_PER_BIT * 1000)) / 1000);
+				abs(((int32_t)mg2l1_current_raw * (int32_t)(chargerConfig.mg1_current_amp_per_bit * 1000)) / 1000);
 		int16_t l2_current_A =
-				abs(((int32_t)mg2l2_current_raw * (int32_t)(MG1_CURRENT_A_PER_BIT * 1000)) / 1000);
+				abs(((int32_t)mg2l2_current_raw * (int32_t)(chargerConfig.mg1_current_amp_per_bit * 1000)) / 1000);
 		int16_t input_now_A = l1_current_A > l2_current_A ? l1_current_A : l2_current_A;
 		input_current_avgbuf.push(input_now_A);
 		input_dc_current_Ax10 = limit_int32(input_current_avgbuf.avg(10), 0, 32767);
