@@ -84,6 +84,7 @@ Connections:
 
 */
 #include "config.h"
+#include "params.h"
 #include "log.h"
 #include "util.h"
 #include "command_accumulator.h"
@@ -97,22 +98,17 @@ Connections:
 
 // Charging parameters
 #define OUTPUT_CURRENT_MAX_A 80
-#define BATTERY_CHARGE_VOLTAGE 300
 
 // Other behavior
 #define EVSE_FORCE_INPUT_AMPS 0  // If 0, EVSE CP PWM is followed
 #define EVSE_PWM_TIMEOUT_MS 50
 #define MAX_PRECHARGE_MS 30000
-#define AC_PRECHARGE_MINIMUM_VOLTAGE 550  // European 3-phase rectifies to 600V
-#define PRECHARGE_BOOST_ENABLED true
 #define PRECHARGE_BOOST_START_MS 0
-#define PRECHARGE_BOOST_VOLTAGE 550  // European 3-phase rectifies to 600V
 //#define PWM_FREQ 3900  // Works for sure, but is very loud
 #define PWM_FREQ 10000  // Not much tested, but is much quieter
 
 // CANbus
 // Edit send_canbus_frames(), handle_canbus_frame() and init_system_can_filters() to do what you need
-#define CANBUS_ENABLE true
 #define CANBUS_SEND_INTERVAL_MS 200
 #define CANBUS_TIMEOUT_MS 2000
 
@@ -133,12 +129,13 @@ Connections:
 #define BOOST_MAX_TEMPERATURE_C 70
 
 // Some secondary values that can be automatically set
-#define BATTERY_MINIMUM_VOLTAGE (BATTERY_CHARGE_VOLTAGE / 2)
+//#define BATTERY_MINIMUM_VOLTAGE (BATTERY_CHARGE_VOLTAGE / 2)
 
 // Hardcoded tests
 #define TEST_CONTACTORS false
 #define TEST_BOOST false
 #define TEST_BUCK false
+#define SKIP_CURRENT true
 
 // Scaling of analog inputs
 // NOTE: DCBUS2 is buck high side = MG side = 3-phase AC input side
@@ -232,7 +229,7 @@ int8_t boost_t2_c = 0;
 volatile uint8_t interrupt_counter_for_mainloop = 0;
 volatile bool mainloop_running = false;
 volatile bool console_report_all_values = false;
-CommandAccumulator<24> command_accumulator;
+CommandAccumulator<50> command_accumulator;
 
 enum SwitchingMode {
 	SM_NONE,
@@ -251,6 +248,8 @@ SwitchingMode wanted_switching_mode = SM_BUCK;
 volatile int16_t current_pwm = 0;
 volatile enum {BSPS_INIT, BSPS_PULSING, BSPS_PULSED} boost_single_pulse_state = BSPS_INIT;
 SwitchingMode current_switching_mode = SM_BUCK;
+
+ChargerConfig chargerConfig;
 
 // CANbus
 
@@ -426,9 +425,9 @@ void setup()
 	// data that fast with our monster interrupt routine running in sync with
 	// PWM generation.
 	Serial.begin(57600);
-
+  
 	log_println_f("-!- prius3charger_buck");
-
+  chargerConfig = loadConfig();
 #if TEST_CONTACTORS == true
 	for(;;){
 		log_println_f("DEBUG: AC_PRECHARGE_SWITCH_PIN on");
@@ -463,7 +462,7 @@ void setup()
 
 void calibrate_current_sensor_zero_offsets_if_needed()
 {
-	if(current_sensor_zero_offsets_calibrated)
+	if(current_sensor_zero_offsets_calibrated || SKIP_CURRENT)
 		return;
 
 	// Calibrate current sensor zero offsets before PWM output is initialized
@@ -625,7 +624,7 @@ void charger_fail(ChargerFailReason fail_reason)
 // Returns true if failed
 bool fail_if_charging_unsafe()
 {
-	if(CANBUS_ENABLE){
+	if(chargerConfig.canbus_enabled){
 		if(!canbus_alive()){
 			charger_fail(CFR_CANBUS_DEAD);
 			return true;
@@ -750,7 +749,7 @@ void handle_charger_state()
 		}
 	});
 	HANDLE_CHARGER_STATE(WAITING_CANBUS, [&](){
-		if(CANBUS_ENABLE){
+		if(chargerConfig.canbus_enabled){
 			if(canbus_alive()){
 				log_println_f("CANbus detected");
 				charger_state = CS_WAITING_CHARGE_PERMISSION;
@@ -764,8 +763,8 @@ void handle_charger_state()
 		}
 	});
 	HANDLE_CHARGER_STATE(WAITING_CHARGE_PERMISSION, [&](){
-		if((canbus_status.permit_charge || !CANBUS_ENABLE) && evse_pp_cable_rating_a > 0){
-			if(CANBUS_ENABLE){
+		if((canbus_status.permit_charge || !chargerConfig.canbus_enabled) && evse_pp_cable_rating_a > 0){
+			if(chargerConfig.canbus_enabled){
 				log_println_f("BMS gives charge permission and cable proximity pilot is connected. Starting AC side precharge");
 			} else {
 				log_println_f("Cable proximity pilot is connected. Starting AC side precharge");
@@ -785,7 +784,7 @@ void handle_charger_state()
 			return;
 		}
 		EVERY_N_MILLISECONDS(5000){
-			if(CANBUS_ENABLE){
+			if(chargerConfig.canbus_enabled){
 				if(!canbus_status.permit_charge){
 					log_println_f("... Waiting for BMS charge permission");
 				}
@@ -824,7 +823,7 @@ void handle_charger_state()
 			if(!charger.battery_side_looks_precharged){
 				if(
 					abs(output_voltage_V - charger.precharge_last_battery_voltage) <= 2 &&
-					output_voltage_V >= BATTERY_MINIMUM_VOLTAGE
+					output_voltage_V >= (chargerConfig.battery_charge_voltage_V /2)
 				){
 					log_print_timestamp();
 					CONSOLE.print(F("-> Battery side precharge looks FINISHED at "));
@@ -842,7 +841,7 @@ void handle_charger_state()
 				}
 			}
 
-			if(CANBUS_ENABLE){
+			if(chargerConfig.canbus_enabled){
 				if(!canbus_status.main_contactor_closed){
 					charger.battery_side_looks_precharged = false;
 				}
@@ -854,8 +853,8 @@ void handle_charger_state()
 			if(!digitalRead(AC_CONTACTOR_SWITCH_PIN)){
 				if(
 					(abs(input_voltage_V - charger.precharge_last_input_voltage) <= 2
-							|| PRECHARGE_BOOST_ENABLED) &&
-					input_voltage_V >= AC_PRECHARGE_MINIMUM_VOLTAGE
+							|| chargerConfig.precharge_boost_enabled) &&
+					input_voltage_V >= chargerConfig.precharge_voltage_V
 				){
 					uint16_t finish_voltage = input_voltage_V;
 
@@ -900,7 +899,7 @@ void handle_charger_state()
 			CONSOLE.print(F("-> Precharge FAILED at "));
 			CONSOLE.print(input_voltage_V);
 			CONSOLE.print(F("V: Voltage not reaching target "));
-			CONSOLE.print(AC_PRECHARGE_MINIMUM_VOLTAGE);
+			CONSOLE.print(chargerConfig.precharge_voltage_V);
 			CONSOLE.println("V");
 			// Fail
 			charger_fail(CFR_AC_PRECHARGE_FAILED);
@@ -911,7 +910,7 @@ void handle_charger_state()
 		// configured.
 		// This can be done only after the battery side has been precharged
 		// first.
-		if(PRECHARGE_BOOST_ENABLED &&
+		if(chargerConfig.precharge_boost_enabled &&
 				timestamp_age(charger.precharge_start_timestamp) > PRECHARGE_BOOST_START_MS){
 			if(!charger.battery_side_looks_precharged){
 				EVERY_N_MILLISECONDS(5000){
@@ -919,7 +918,7 @@ void handle_charger_state()
 				}
 			}
 			if(charger.battery_side_looks_precharged &&
-					input_voltage_V < PRECHARGE_BOOST_VOLTAGE &&
+					input_voltage_V < chargerConfig.precharge_voltage_V &&
 					input_voltage_V < INPUT_VOLTAGE_MAX_V - 20){
 				EVERY_N_MILLISECONDS(500){
 					log_println_f("... Doing AC side precharge boost pulses");
@@ -927,7 +926,7 @@ void handle_charger_state()
 				EVERY_N_MILLISECONDS(1){
 					// Make one boost pulse at a time so that we get updated
 					// voltage measurements in between
-					set_wanted_output_V_A_pwm(PRECHARGE_BOOST_VOLTAGE, 1, ICR1*0.05,
+					set_wanted_output_V_A_pwm(chargerConfig.precharge_voltage_V, 1, ICR1*0.05,
 							SM_BOOST_SINGLE_PULSE);
 				}
 			} else {
@@ -956,7 +955,7 @@ void handle_charger_state()
 
 		check_and_react_if_high_power_input_failed();
 
-		if(CANBUS_ENABLE){
+		if(chargerConfig.canbus_enabled){
 			if(!canbus_status.permit_charge || !canbus_status.main_contactor_closed){
 				report_status_on_console();
 				log_println_f("BMS does not permit charging");
@@ -968,7 +967,7 @@ void handle_charger_state()
 
 		// Stop charging if finished
 
-		if(CANBUS_ENABLE){
+		if(chargerConfig.canbus_enabled){
 			if(canbus_status.charge_completed){
 				report_status_on_console();
 				log_println_f("BMS reports charge completion");
@@ -978,7 +977,7 @@ void handle_charger_state()
 			}
 		}
 
-		if(output_voltage_V >= BATTERY_CHARGE_VOLTAGE - 2 &&
+		if(output_voltage_V >= chargerConfig.battery_charge_voltage_V - 2 &&
 				output_dc_current_Ax10 < 5){
 			if(timestamp_younger_than(charger.start_timestamp, 30000)){
 				EVERY_N_MILLISECONDS(5000){
@@ -995,15 +994,15 @@ void handle_charger_state()
 
 		// Update output according to vehicle requirements
 
-		if(CANBUS_ENABLE){
+		if(chargerConfig.canbus_enabled){
 			set_wanted_output_V_A_pwm(
-					BATTERY_CHARGE_VOLTAGE,
+					chargerConfig.battery_charge_voltage_V,
 					canbus_status.max_charge_current_A,
 					PWM_MAX,
 					SM_BUCK);
 		} else {
 			set_wanted_output_V_A_pwm(
-					BATTERY_CHARGE_VOLTAGE,
+					chargerConfig.battery_charge_voltage_V,
 					OUTPUT_CURRENT_MAX_A,
 					PWM_MAX,
 					SM_BUCK);
@@ -1505,6 +1504,11 @@ SIGNAL(TIMER1_CAPT_vect)
 	interrupt_counter++;
 }
 
+void report_params_on_console() {
+  printChargerConfig(&chargerConfig);
+
+}
+
 void report_status_on_console()
 {
 	static unsigned long last_accurate_report_timestamp = 0;
@@ -1515,7 +1519,7 @@ void report_status_on_console()
 	}
 
 	// Configuration
-	REPORT_INT16(BATTERY_CHARGE_VOLTAGE);
+	REPORT_INT16(chargerConfig.battery_charge_voltage_V);
 	REPORT_INT16(OUTPUT_CURRENT_MAX_A);
 
 	// PWM control
@@ -1554,7 +1558,7 @@ void report_status_on_console()
 	REPORT_ENUM(charger.fail_reason, ChargerFailReason_STRINGS);
 
 	// BMS
-	if(CANBUS_ENABLE){
+	if(chargerConfig.canbus_enabled){
 		REPORT_BOOL(canbus_alive())
 		REPORT_INT16_FORMAT(canbus_status.max_charge_current_A, accurate ? 1 : 2, 1, "A")
 		REPORT_INT16_FORMAT(canbus_status.cell_voltage_max_mV, accurate ? 10 : 100, 0.001, "V")
@@ -1610,9 +1614,14 @@ void console_help()
 {
 	CONSOLE.println(F("Useful commands:"));
 	CONSOLE.println(F("  r (report)"));
+  CONSOLE.println(F("  p (params)"));
 	CONSOLE.println(F("  chp  (charger stop)"));
 	CONSOLE.println(F("  chr  (charger restore)"));
 	CONSOLE.println(F("  aca <A>  (force_ac_input_amps)"));
+  CONSOLE.println(F("  set <param> <value>  (set a param value)"));
+  CONSOLE.println(F("  params  (prints params JSON format)"));
+  CONSOLE.println(F("  save  (Save params to EEPROM)"));
+
 }
 
 void handle_command(const char *command, size_t command_len)
@@ -1638,11 +1647,27 @@ void handle_command(const char *command, size_t command_len)
 	if(strncmp(command, "aca ", 4) == 0){
 		force_ac_input_amps = strtol(&command[4], NULL, 10);
 		log_print_timestamp();
+    CONSOLE.println(&command[*strchr(&command[4], " ")]);
 		CONSOLE.print(F("force_ac_input_amps set: "));
 		CONSOLE.print(force_ac_input_amps);
 		CONSOLE.println(F(" A"));
 		return;
 	}
+
+ if(strncmp(command, "set ", 4) == 0){
+    parseCommand(&command[4], &chargerConfig);
+    printChargerConfig(&chargerConfig);
+    return;
+  }
+  if(strcmp(command, "params") == 0 || strcmp(command, "p") == 0){
+    report_params_on_console();
+    return;
+  }
+
+  if(strncmp(command, "save", 4) == 0){
+    saveChargerConfig(chargerConfig);
+    return;
+  }
 
 	CONSOLE.print(F("Unknown command: "));
 	CONSOLE.println(command);
@@ -1940,7 +1965,7 @@ static void handle_canbus_frame(const CAN_FRAME &frame)
 
 static void apply_canbus_timeouts()
 {
-	if(CANBUS_ENABLE){
+	if(chargerConfig.canbus_enabled){
 		static bool canbus_reported_alive = false;
 		if(canbus_alive()){
 			if(!canbus_reported_alive &&
@@ -1961,7 +1986,7 @@ static void apply_canbus_timeouts()
 
 static void read_canbus_frames()
 {
-	if(CANBUS_ENABLE){
+	if(chargerConfig.canbus_enabled){
 		for(uint8_t i=0; i<10 && !digitalRead(MCP2515_INT_PIN); i++){
 			CAN_FRAME frame;
 			canc_read(system_can, frame);
