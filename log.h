@@ -41,15 +41,12 @@ static void log_print_timestamp()
 
 static void log_println(const char *line)
 {
-	log_print_timestamp();
 	CONSOLE.println(line);
 }
 
 static void log_println_P(const char *line)
 {
-	log_print_timestamp();
 	CONSOLE.println((__FlashStringHelper*)line);
 }
 
 #define log_println_f(x) log_println_P(PSTR(x))
-

@@ -58,8 +58,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static bool reported_value = false;\
 		if(var != reported_value || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			if(var)\
 				CONSOLE.println(F("TRUE"));\
 			else\
@@ -72,8 +71,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint8_t reported_value = 0;\
 		if(var != reported_value){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(var);\
 			reported_value = var;\
 		}\
@@ -83,8 +81,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint16_t reported_value = 0;\
 		if(var != reported_value || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(var);\
 			reported_value = var;\
 		}\
@@ -94,8 +91,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static int16_t reported_value = 0;\
 		if(var != reported_value || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(var);\
 			reported_value = var;\
 		}\
@@ -105,8 +101,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint8_t reported_value = 0;\
 		if(abs(((int16_t)var - (int16_t)reported_value)) > (hys) || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(var);\
 			reported_value = var;\
 		}\
@@ -116,8 +111,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint16_t reported_value = 0;\
 		if(abs(((int32_t)var - (int32_t)reported_value)) > (hys) || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(var);\
 			reported_value = var;\
 		}\
@@ -127,8 +121,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static int16_t reported_value = 0;\
 		if(abs((int16_t)((int32_t)var - (int32_t)reported_value)) > (hys) || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(var);\
 			reported_value = var;\
 		}\
@@ -138,8 +131,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint16_t reported_value = 0;\
 		if(abs((int16_t)((int32_t)var - (int32_t)reported_value)) > (hys) || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.print((float)var * mul);\
 			CONSOLE.println(F(unit));\
 			reported_value = var;\
@@ -150,8 +142,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static int16_t reported_value = 0;\
 		if(abs(var - reported_value) > (hys) || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.print((float)var * mul);\
 			CONSOLE.println(F(unit));\
 			reported_value = var;\
@@ -162,8 +153,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint8_t reported_value = 0;\
 		if(var != reported_value || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println(names[var]);\
 			reported_value = var;\
 		}\
@@ -173,8 +163,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint8_t reported_value = 0;\
 		if(var != reported_value || console_report_all_values){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			CONSOLE.println((__FlashStringHelper*)pgm_read_word(&names[var]));\
 			reported_value = var;\
 		}\
@@ -184,8 +173,7 @@ static bool ENM_compare_and_update(unsigned long &t0, const unsigned long &inter
 	{\
 		static uint16_t reported_value = 0;\
 		if(var != reported_value){\
-			log_print_timestamp();\
-			CONSOLE.print(F(">> "#var" = "));\
+			CONSOLE.print(F("{COMMAND} "#var" = "));\
 			for(uint16_t i=0; i<num_bits; i++){\
 				if(var & bit(i)){\
 					CONSOLE.print(names[i]);\

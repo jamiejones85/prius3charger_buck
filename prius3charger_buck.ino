@@ -419,20 +419,20 @@ void setup()
 	// PWM generation.
 	Serial.begin(57600);
   
-	log_println_f("-!- prius3charger_buck");
+	log_println_f("{DEBUG} prius3charger_buck");
   chargerConfig = loadConfig();
 #if TEST_CONTACTORS == true
 	for(;;){
-		log_println_f("DEBUG: AC_PRECHARGE_SWITCH_PIN on");
+		log_println_f("{DEBUG} AC_PRECHARGE_SWITCH_PIN on");
 		digitalWrite(AC_PRECHARGE_SWITCH_PIN, HIGH);
 		delay(1900);
-		log_println_f("DEBUG: AC_CONTACTOR_SWITCH_PIN on");
+		log_println_f("{DEBUG} AC_CONTACTOR_SWITCH_PIN on");
 		digitalWrite(AC_CONTACTOR_SWITCH_PIN, HIGH);
 		delay(100);
-		log_println_f("DEBUG: AC_PRECHARGE_SWITCH_PIN off");
+		log_println_f("{DEBUG} AC_PRECHARGE_SWITCH_PIN off");
 		digitalWrite(AC_PRECHARGE_SWITCH_PIN, LOW);
 		delay(2000);
-		log_println_f("DEBUG: AC_CONTACTOR_SWITCH_PIN off");
+		log_println_f("{DEBUG} AC_CONTACTOR_SWITCH_PIN off");
 		digitalWrite(AC_CONTACTOR_SWITCH_PIN, LOW);
 		delay(2000);
 	}
@@ -459,7 +459,7 @@ void calibrate_current_sensor_zero_offsets_if_needed()
 		return;
 
 	// Calibrate current sensor zero offsets before PWM output is initialized
-	Serial.println(F("Calibrating current sensor zero offsets..."));
+	Serial.println(F("{DEBUG} Calibrating current sensor zero offsets..."));
 	set_pwm_inactive();
 
 	int16_t il1_0 = analogRead(MG1_L1_CURRENT_PIN);
@@ -478,7 +478,7 @@ void calibrate_current_sensor_zero_offsets_if_needed()
 		stable_count++;
 	}
 	if(il1_1 < 460 || il1_1 > 570 || il2_1 < 460 || il2_1 > 570){
-		Serial.print(F("Not accepting current calibration values: "));
+		Serial.print(F("{ERROR} Not accepting current calibration values: "));
 		Serial.print(il1_1);
 		Serial.print(F(", "));
 		Serial.print(il2_1);
@@ -487,7 +487,7 @@ void calibrate_current_sensor_zero_offsets_if_needed()
 		return;
 	}
 	if(stable_count < require_stable_count){
-		Serial.print(F("Not accepting current calibration values: "));
+		Serial.print(F("{ERROR} Not accepting current calibration values: "));
 		Serial.print(il1_1);
 		Serial.print(F(", "));
 		Serial.print(il2_1);
@@ -497,8 +497,7 @@ void calibrate_current_sensor_zero_offsets_if_needed()
 	}
 	mg2l1_current_raw_calibrated_zero = il1_1;
 	mg2l2_current_raw_calibrated_zero = il2_1;
-	log_print_timestamp();
-	Serial.print(F("Calibrated zero offsets: IL1,2: "));
+	Serial.print(F("{DEBUG} Calibrated zero offsets: IL1,2: "));
 	Serial.print(mg2l1_current_raw_calibrated_zero);
 	Serial.print(F(", "));
 	Serial.print(mg2l2_current_raw_calibrated_zero);
@@ -528,8 +527,9 @@ void loop()
 	dcbus1_raw = analogRead(DCBUS1_PIN) - DCBUS1_OFFSET_BITS;
 	output_voltage_V = ((int32_t)dcbus1_raw * (int32_t)(DCBUS1_V_PER_BIT*1000)) / 1000;
 	EVERY_N_MILLISECONDS(200){
+    Serial.print(F("{DEBUG} "));
 		Serial.print(output_voltage_V);
-		Serial.print(" ");
+		Serial.print(F(" "));
 		Serial.println(input_voltage_V);
 	}
 	if(input_voltage_V < 400 && ((millis()/1000)&1)==0){
@@ -545,8 +545,9 @@ void loop()
 	dcbus1_raw = analogRead(DCBUS1_PIN) - DCBUS1_OFFSET_BITS;
 	output_voltage_V = ((int32_t)dcbus1_raw * (int32_t)(DCBUS1_V_PER_BIT*1000)) / 1000;
 	EVERY_N_MILLISECONDS(200){
+    Serial.print(F("{DEBUG} "));
 		Serial.print(output_voltage_V);
-		Serial.print(" ");
+    Serial.print(F(" "));
 		Serial.println(input_voltage_V);
 	}
 	if(output_voltage_V < 20 && ((millis()/1000)&1)==0){
@@ -608,8 +609,7 @@ void charger_fail(ChargerFailReason fail_reason)
 	digitalWrite(AC_PRECHARGE_SWITCH_PIN, LOW);
 	digitalWrite(EVSE_SW_PIN, LOW);
 
-	log_print_timestamp();
-	CONSOLE.print("Charger failed: \"");
+	CONSOLE.print("{ERROR} Charger failed: \"");
 	CONSOLE.print(ChargerFailReason_STRINGS[charger.fail_reason]);
 	CONSOLE.println("\"");
 }
@@ -644,9 +644,9 @@ bool fail_if_charging_unsafe()
 
 void restore_initial_state()
 {
-	log_println_f("restore_initial_state()");
+	log_println_f("{DEBUG} restore_initial_state()");
 	if(charger_state != CS_FAILED && charger_state != CS_DONE_CHARGING){
-		log_println_f("restore_initial_state(): Can't restore: Not failed or ended");
+		log_println_f("{DEBUG} restore_initial_state(): Can't restore: Not failed or ended");
 		return;
 	}
 	charger_state = CS_WAITING_START_TRIGGER;
@@ -655,11 +655,11 @@ void restore_initial_state()
 
 void start_charging()
 {
-	log_println_f("start_charging()");
+	log_println_f("{DEBUG} start_charging()");
 
 	if(charger_state != CS_WAITING_START_TRIGGER &&
 			charger_state != CS_DONE_CHARGING){
-		log_println_f("Can't start charge: Not at charge cycle start or done charging");
+		log_println_f("{DEBUG} Can't start charge: Not at charge cycle start or done charging");
 		return;
 	}
 
@@ -688,15 +688,15 @@ void stop_charging()
 		// Don't change failed state to anything else here as that can be unsafe.
 		// Failed state can only be restored by power cycling or by
 		// restore_initial_state().
-		log_println_f("stop_charging(): Charger is in failed state.");
+		log_println_f("{DEBUG} stop_charging(): Charger is in failed state.");
 		return;
 	}
 	if(charger_state == CS_STOPPING_CHARGE){
-		log_println_f("stop_charging(): Already stopped");
+		log_println_f("{DEBUG} stop_charging(): Already stopped");
 		return;
 	}
 
-	log_println_f("Stopping charger");
+	log_println_f("{DEBUG} Stopping charger");
 
 	charger_state = CS_STOPPING_CHARGE;
 	charger.stopping_charge_start_timestamp = millis();
@@ -719,11 +719,11 @@ void handle_charger_state()
 		if(evse_pp_cable_rating_a > 0 && get_max_input_a() > 0 && current_sensor_zero_offsets_calibrated){
 			// Wait until 2 seconds of continuous start conditions
 			if(timestamp_age(charger.no_start_condition_timestamp) >= 2000){
-				log_println_f("Charger start triggered");
+				log_println_f("{STATUS} Charger start triggered");
 				start_charging();
 			} else {
 				EVERY_N_MILLISECONDS(500){
-					log_println_f("... Waiting stable starting condition for 2000ms");
+					log_println_f("{DEBUG} Waiting stable starting condition for 2000ms");
 				}
 			}
 			return;
@@ -732,11 +732,11 @@ void handle_charger_state()
 		}
 		EVERY_N_MILLISECONDS(5000){
 			if(evse_pp_cable_rating_a == 0){
-				log_println_f("... Waiting for EVSE PP connection"
+				log_println_f("{DEBUG} Waiting for EVSE PP connection"
 						" (pull it to ground if you don't have EVSE)");
 			}
 			if(get_max_input_a() == 0 && force_ac_input_amps == 0){
-				log_println_f("... Waiting for EVSE CP PWM"
+				log_println_f("{DEBUG} Waiting for EVSE CP PWM"
 						" (set force_ac_input_amps if you don't have EVSE)");
 			}
 		}
@@ -744,11 +744,11 @@ void handle_charger_state()
 	HANDLE_CHARGER_STATE(WAITING_CANBUS, [&](){
 		if(chargerConfig.canbus_enabled){
 			if(canbus_alive()){
-				log_println_f("CANbus detected");
+				log_println_f("{DEBUG} CANbus detected");
 				charger_state = CS_WAITING_CHARGE_PERMISSION;
 			}
 			EVERY_N_MILLISECONDS(5000){
-				log_println_f("... Waiting for CANbus");
+				log_println_f("{DEBUG} Waiting for CANbus");
 			}
 		} else {
 			// Skip ahead, we don't need no CANbus!
@@ -758,9 +758,9 @@ void handle_charger_state()
 	HANDLE_CHARGER_STATE(WAITING_CHARGE_PERMISSION, [&](){
 		if((canbus_status.permit_charge || !chargerConfig.canbus_enabled) && evse_pp_cable_rating_a > 0){
 			if(chargerConfig.canbus_enabled){
-				log_println_f("BMS gives charge permission and cable proximity pilot is connected. Starting AC side precharge");
+				log_println_f("{DEBUG} BMS gives charge permission and cable proximity pilot is connected. Starting AC side precharge");
 			} else {
-				log_println_f("Cable proximity pilot is connected. Starting AC side precharge");
+				log_println_f("{DEBUG} Cable proximity pilot is connected. Starting AC side precharge");
 			}
 			charger_state = CS_PRECHARGING;
 
@@ -770,8 +770,7 @@ void handle_charger_state()
 
 			report_status_on_console();
 
-			log_print_timestamp();
-			CONSOLE.print(F("Precharge starting at "));
+			CONSOLE.print(F("{DEBUG} Precharge starting at "));
 			CONSOLE.print(charger.precharge_last_input_voltage);
 			CONSOLE.println(" V");
 			return;
@@ -779,11 +778,11 @@ void handle_charger_state()
 		EVERY_N_MILLISECONDS(5000){
 			if(chargerConfig.canbus_enabled){
 				if(!canbus_status.permit_charge){
-					log_println_f("... Waiting for BMS charge permission");
+					log_println_f("{DEBUG} Waiting for BMS charge permission");
 				}
 			}
 			if(evse_pp_cable_rating_a == 0){
-				log_println_f("... Waiting for EVSE proximity pilot connection");
+				log_println_f("{DEBUG} Waiting for EVSE proximity pilot connection");
 			}
 		}
 	});
@@ -818,15 +817,13 @@ void handle_charger_state()
 					abs(output_voltage_V - charger.precharge_last_battery_voltage) <= 2 &&
 					output_voltage_V >= (chargerConfig.battery_charge_voltage_V /2)
 				){
-					log_print_timestamp();
-					CONSOLE.print(F("-> Battery side precharge looks FINISHED at "));
+					CONSOLE.print(F("{DEBUG} Battery side precharge looks FINISHED at "));
 					CONSOLE.print(output_voltage_V);
 					CONSOLE.println("V");
 
 					charger.battery_side_looks_precharged = true;
 				} else {
-					log_print_timestamp();
-					CONSOLE.print(F("... Battery side precharging at "));
+					CONSOLE.print(F("{DEBUG} Battery side precharging at "));
 					CONSOLE.print(output_voltage_V);
 					CONSOLE.println("V");
 
@@ -859,12 +856,12 @@ void handle_charger_state()
 					digitalWrite(AC_PRECHARGE_SWITCH_PIN, LOW);
 
 					log_print_timestamp();
-					CONSOLE.print(F("-> AC side precharge FINISHED at "));
+					CONSOLE.print(F("{DEBUG} AC side precharge FINISHED at "));
 					CONSOLE.print(finish_voltage);
 					CONSOLE.println("V, AC contactor CLOSED");
 				} else {
 					log_print_timestamp();
-					CONSOLE.print(F("... AC side precharging at "));
+					CONSOLE.print(F("{DEBUG} AC side precharging at "));
 					CONSOLE.print(input_voltage_V);
 					CONSOLE.println("V");
 
@@ -875,7 +872,7 @@ void handle_charger_state()
 
 		// Precharge finish condition
 		if(digitalRead(AC_CONTACTOR_SWITCH_PIN) && charger.battery_side_looks_precharged){
-			log_println_f("Input and battery side precharge done, now charging.");
+			log_println_f("{DEBUG} Input and battery side precharge done, now charging.");
 			charger_state = CS_CHARGING;
 			return;
 		}
@@ -889,7 +886,7 @@ void handle_charger_state()
 			set_pwm_inactive();
 			// Report
 			log_print_timestamp();
-			CONSOLE.print(F("-> Precharge FAILED at "));
+			CONSOLE.print(F("{ERROR} Precharge FAILED at "));
 			CONSOLE.print(input_voltage_V);
 			CONSOLE.print(F("V: Voltage not reaching target "));
 			CONSOLE.print(chargerConfig.precharge_voltage_V);
@@ -907,14 +904,14 @@ void handle_charger_state()
 				timestamp_age(charger.precharge_start_timestamp) > PRECHARGE_BOOST_START_MS){
 			if(!charger.battery_side_looks_precharged){
 				EVERY_N_MILLISECONDS(5000){
-					log_println_f("... Waiting battery side to be precharged before boosting");
+					log_println_f("{DEBUG} Waiting battery side to be precharged before boosting");
 				}
 			}
 			if(charger.battery_side_looks_precharged &&
 					input_voltage_V < chargerConfig.precharge_voltage_V &&
 					input_voltage_V < INPUT_VOLTAGE_MAX_V - 20){
 				EVERY_N_MILLISECONDS(500){
-					log_println_f("... Doing AC side precharge boost pulses");
+					log_println_f("{DEBUG} Doing AC side precharge boost pulses");
 				}
 				EVERY_N_MILLISECONDS(1){
 					// Make one boost pulse at a time so that we get updated
@@ -931,12 +928,12 @@ void handle_charger_state()
 		// Report what we're waiting for
 		if(!digitalRead(AC_CONTACTOR_SWITCH_PIN)){
 			EVERY_N_MILLISECONDS(5000){
-				log_println_f("... Doing AC side precharge");
+				log_println_f("{DEBUG} Doing AC side precharge");
 			}
 		}
 		if(!charger.battery_side_looks_precharged){
 			EVERY_N_MILLISECONDS(5000){
-				log_println_f("... Doing battery side precharge");
+				log_println_f("{DEBUG} Doing battery side precharge");
 			}
 		}
 	});
@@ -951,7 +948,7 @@ void handle_charger_state()
 		if(chargerConfig.canbus_enabled){
 			if(!canbus_status.permit_charge || !canbus_status.main_contactor_closed){
 				report_status_on_console();
-				log_println_f("BMS does not permit charging");
+				log_println_f("{DEBUG} BMS does not permit charging");
 				charger_state = CS_STOPPING_CHARGE;
 				charger.stopping_charge_start_timestamp = millis();
 				return;
@@ -963,7 +960,7 @@ void handle_charger_state()
 		if(chargerConfig.canbus_enabled){
 			if(canbus_status.charge_completed){
 				report_status_on_console();
-				log_println_f("BMS reports charge completion");
+				log_println_f("{DEBUG} BMS reports charge completion");
 				charger_state = CS_STOPPING_CHARGE;
 				charger.stopping_charge_start_timestamp = millis();
 				return;
@@ -974,11 +971,11 @@ void handle_charger_state()
 				output_dc_current_Ax10 < 5){
 			if(timestamp_younger_than(charger.start_timestamp, 30000)){
 				EVERY_N_MILLISECONDS(5000){
-					log_println_f("... Charging looks complete but continuing (ignoring BMS)");
+					log_println_f("{DEBUG} Charging looks complete but continuing (ignoring BMS)");
 				}
 			} else {
 				report_status_on_console();
-				log_println_f("Charging looks complete, stopping (ignoring BMS)");
+				log_println_f("{DEBUG} Charging looks complete, stopping (ignoring BMS)");
 				charger_state = CS_STOPPING_CHARGE;
 				charger.stopping_charge_start_timestamp = millis();
 				return;
@@ -1013,7 +1010,7 @@ void handle_charger_state()
 		}
 
 		EVERY_N_MILLISECONDS(5000){
-			log_println_f("... Stopping charge");
+			log_println_f("{DEBUG} Stopping charge");
 		}
 	});
 	HANDLE_CHARGER_STATE(DONE_CHARGING, [&](){
@@ -1024,7 +1021,7 @@ void handle_charger_state()
 		digitalWrite(EVSE_SW_PIN, LOW);
 
 		EVERY_N_MILLISECONDS(5000){
-			log_println_f("... Done charging");
+			log_println_f("{DEBUG} Done charging");
 		}
 	});
 	HANDLE_CHARGER_STATE(FAILED, [&](){
@@ -1036,7 +1033,7 @@ void handle_charger_state()
 
 		EVERY_N_MILLISECONDS(5000){
 			log_print_timestamp();
-			CONSOLE.print("... In fault state: \"");
+			CONSOLE.print("{ERROR} In fault state: \"");
 			CONSOLE.print(ChargerFailReason_STRINGS[charger.fail_reason]);
 			CONSOLE.println("\"");
 		}
@@ -1054,11 +1051,11 @@ void handle_charger_state()
 			charger_fail(CFR_CUSTOM_MEASUREMENT_DELAY_ENDED);
 		}
 		EVERY_N_MILLISECONDS(2000){
-			log_println_f("... Allowing measurement for 15s");
+			log_println_f("{DEBUG} Allowing measurement for 15s");
 		}
 	});
 
-	log_println_f("Unhandled charger state; falling back to stopping charge");
+	log_println_f("{ERROR} Unhandled charger state; falling back to stopping charge");
 	charger_fail(CFR_UNHANDLED_STATE);
 }
 
@@ -1079,11 +1076,11 @@ void control_inductor_short_switch()
 			timestamp_age(ac_contactor_closed_timestamp) >= 500){
 		if(!digitalRead(CONVERTER_SHORT_SWITCH_PIN)){
 			if(abs(input_voltage_V - output_voltage_V) < 20){
-				log_println_f("Closing converter short switch");
+				log_println_f("{DEBUG} Closing converter short switch");
 				digitalWrite(CONVERTER_SHORT_SWITCH_PIN, HIGH);
 			} else {
 				EVERY_N_MILLISECONDS(5000){
-					log_println_f("Can't close converter short switch due to voltage "
+					log_println_f("{DEBUG} Can't close converter short switch due to voltage "
 							"difference. If you're using the feature, make sure to "
 							"have a bleed down resistor in parallel with the "
 							"converter short switch.");
@@ -1095,7 +1092,7 @@ void control_inductor_short_switch()
 		// short switch, and tell the programmer they messed up. You can look up
 		// if you find this in logs if your 3 phase breaker opened.
 		if(digitalRead(CONVERTER_SHORT_SWITCH_PIN)){
-			log_println_f("WARNING: CONVERTER_SHORT_SWITCH was active while AC "
+			log_println_f("{ERROR} CONVERTER_SHORT_SWITCH was active while AC "
 					"was active. The short switch has now been deactivated.");
 			digitalWrite(CONVERTER_SHORT_SWITCH_PIN, LOW);
 		}
@@ -1128,7 +1125,7 @@ void check_and_react_if_high_power_input_failed()
 	EVERY_N_MILLISECONDS(1000){
 		if(voltage_now < RECTIFIED_AC_MINIMUM_VOLTAGE){
 			log_print_timestamp();
-			CONSOLE.print(F("Input voltage dropped below the minimum voltage "));
+			CONSOLE.print(F("{DEBUG} Input voltage dropped below the minimum voltage "));
 			CONSOLE.print(RECTIFIED_AC_MINIMUM_VOLTAGE);
 			CONSOLE.println(F(" V"));
 
@@ -1138,7 +1135,7 @@ void check_and_react_if_high_power_input_failed()
 
 		if(voltage_now > INPUT_VOLTAGE_MAX_V){
 			log_print_timestamp();
-			CONSOLE.print(F("Input voltage rose above the maximum voltage "));
+			CONSOLE.print(F("{DEBUG} Input voltage rose above the maximum voltage "));
 			CONSOLE.print(INPUT_VOLTAGE_MAX_V);
 			CONSOLE.println(F(" V"));
 
@@ -1487,7 +1484,7 @@ SIGNAL(TIMER1_CAPT_vect)
 		if(interrupt_counter == 0){ // 29Hz, 34ms
 			// If main loop doesn't reset counter before 340ms, issue warning
 			if(interrupt_counter_for_mainloop > 10){
-				Serial.println(F("WARNING: Too little time for main loop detected"));
+				Serial.println(F("{DEBUG} Too little time for main loop detected"));
 				interrupt_counter_for_mainloop = 0;
 			}
 			interrupt_counter_for_mainloop++;
@@ -1495,11 +1492,6 @@ SIGNAL(TIMER1_CAPT_vect)
 	}
 
 	interrupt_counter++;
-}
-
-void report_params_on_console() {
-  printChargerConfig(&chargerConfig);
-
 }
 
 void report_status_on_console()
@@ -1512,7 +1504,6 @@ void report_status_on_console()
 	}
 
 	// Configuration
-	REPORT_INT16(chargerConfig.battery_charge_voltage_V);
 	REPORT_INT16(OUTPUT_CURRENT_MAX_A);
 
 	// PWM control
@@ -1579,7 +1570,7 @@ void report_status_on_console()
 			abs(current_pwm - reported_current_pwm) > (accurate ? 1 : (PWM_MAX/100+1)) ||
 			console_report_all_values
 		){
-			log_print_timestamp();
+      CONSOLE.print(F("{STATUS} "));
 			CONSOLE.print(F(">> PWM "));
 			CONSOLE.print((float)current_pwm / (float)(PWM_MAX / 100.0));
 			CONSOLE.print(F("%, in "));
@@ -1620,7 +1611,9 @@ void console_help()
 void handle_command(const char *command, size_t command_len)
 {
 	if(command[0] == 'h' || command[0] == '?'){
+    CONSOLE.println(F("{STARTCOMMAND}"));
 		console_help();
+    CONSOLE.println(F("{ENDCOMMAND}"));
 		return;
 	}
 	if(strcmp(command, "report") == 0 || strcmp(command, "r") == 0){
@@ -1641,7 +1634,7 @@ void handle_command(const char *command, size_t command_len)
 		force_ac_input_amps = strtol(&command[4], NULL, 10);
 		log_print_timestamp();
     CONSOLE.println(&command[*strchr(&command[4], " ")]);
-		CONSOLE.print(F("force_ac_input_amps set: "));
+		CONSOLE.print(F("{COMMAND} force_ac_input_amps set: "));
 		CONSOLE.print(force_ac_input_amps);
 		CONSOLE.println(F(" A"));
 		return;
@@ -1650,19 +1643,25 @@ void handle_command(const char *command, size_t command_len)
  if(strncmp(command, "set ", 4) == 0){
     parseCommand(&command[4], &chargerConfig);
     printChargerConfig(&chargerConfig);
+    CONSOLE.print(F("{COMMAND} Updated "));
+    CONSOLE.println(&command[4]);
+
     return;
   }
   if(strcmp(command, "params") == 0 || strcmp(command, "p") == 0){
-    report_params_on_console();
+    CONSOLE.println(F("{STARTCONFIG}"));
+    printChargerConfig(&chargerConfig);
+    CONSOLE.println(F("{ENDCONFIG}"));    
     return;
   }
 
   if(strncmp(command, "save", 4) == 0){
     saveChargerConfig(chargerConfig);
+    CONSOLE.println(F("{COMMAND} Config Saved to EEPROM"));
     return;
   }
 
-	CONSOLE.print(F("Unknown command: "));
+	CONSOLE.print(F("{COMMAND} Unknown command: "));
 	CONSOLE.println(command);
 	console_help();
 }
@@ -1673,9 +1672,6 @@ void read_console_serial()
 		if(command_accumulator.put_char(CONSOLE.read())){
 			const char *command = command_accumulator.command();
 			size_t len = command_accumulator.next_i;
-			log_print_timestamp();
-			CONSOLE.print(F("Command: "));
-			CONSOLE.println(command);
 			handle_command(command, len);
 		}
 	}
@@ -1783,7 +1779,7 @@ void init_system_can()
 			//system_can.enOneShotTX();
 			break;
 		} else {
-			log_println_f("can_init: MCP2515 init failed");
+			log_println_f("{DEBUG} can_init: MCP2515 init failed");
 		}
 		delay(500);
 	}
@@ -1807,8 +1803,8 @@ void init_system_can_filters()
 	return;
 
 filter_fail:
-	log_println_f("FAILED to set MCP2515 filters");
-	log_println_f("WARNING: CANbus communication will not work correctly.");
+	log_println_f("{DEBUG} FAILED to set MCP2515 filters");
+	log_println_f("{DEBUG} CANbus communication will not work correctly.");
 	//for(;;);
 }
 
@@ -1861,7 +1857,7 @@ void send_canbus_frames()
 
 		if(!canc_send(system_can, frame)){
 			EVERY_N_MILLISECONDS(10000){
-				log_println_f("Failed to send CAN frame 0x600");
+				log_println_f("{ERROR} Failed to send CAN frame 0x600");
 			}
 		}
 	}
@@ -1886,7 +1882,7 @@ void send_canbus_frames()
 
 		if(!canc_send(system_can, frame)){
 			EVERY_N_MILLISECONDS(10000){
-				log_println_f("Failed to send CAN frame 0x320");
+				log_println_f("{ERROR} Failed to send CAN frame 0x320");
 			}
 		}
 	}
@@ -1936,20 +1932,20 @@ static void handle_canbus_frame(const CAN_FRAME &frame)
 				send_canbus_frames();
 
 				log_print_timestamp();
-				CONSOLE.print(F("CANbus setting force_ac_input_amps = "));
+				CONSOLE.print(F("{DEBUG} CANbus setting force_ac_input_amps = "));
 				CONSOLE.println(force_ac_input_amps);
 			}
 		}
 		if(setting_id == 1){
-			log_println_f("CANbus start charge");
+			log_println_f("{DEBUG} CANbus start charge");
 			start_charging();
 		}
 		if(setting_id == 2){
-			log_println_f("CANbus stop charge");
+			log_println_f("{DEBUG} CANbus stop charge");
 			stop_charging();
 		}
 		if(setting_id == 3){
-			log_println_f("CANbus restore initial state");
+			log_println_f("{DEBUG} CANbus restore initial state");
 			restore_initial_state();
 		}
 		return;
@@ -1964,13 +1960,13 @@ static void apply_canbus_timeouts()
 			if(!canbus_reported_alive &&
 					canbus_last_receive_timestamp != 0){
 				canbus_reported_alive = true;
-				log_println_f("CANbus up");
+				log_println_f("{DEBUG} CANbus up");
 				canbus_status = CanbusStatus(); // Reset status
 			}
 		} else {
 			if(canbus_reported_alive){
 				canbus_reported_alive = false;
-				log_println_f("CANbus lost");
+				log_println_f("{DEBUG} CANbus lost");
 				canbus_status = CanbusStatus(); // Reset status
 			}
 		}
