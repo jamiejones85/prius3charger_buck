@@ -95,42 +95,40 @@ void parseCommand(char* command, struct ChargerConfig* c) {
 
 void printChargerConfig(struct ChargerConfig* c) {
   CONSOLE.println(F("{"));
-  CONSOLE.print(F("\"battery_charge_voltage_V\": "));
+  CONSOLE.print(F("\"battery_charge_voltage_V\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print(c->battery_charge_voltage_V);
-  CONSOLE.println(F(","));
+  CONSOLE.println(F("},"));
 
-  CONSOLE.print(F("\"precharge_voltage_V\": "));
+  CONSOLE.print(F("\"precharge_voltage_V\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print(c->precharge_voltage_V);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"precharge_boost_enabled\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"precharge_boost_enabled\": { \"type\": \"bool\", \"value\":"));
   CONSOLE.print(c->precharge_boost_enabled);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"canbus_enabled\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"canbus_enabled\": { \"type\": \"bool\", \"value\":"));
   CONSOLE.print(c->canbus_enabled);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"mg1_current_amp_per_bit\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"mg1_current_amp_per_bit\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print((float)c->mg1_current_amp_per_bit, 2);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"dc1_volt_per_bit\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"dc1_volt_per_bit\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print((float)c->dc1_volt_per_bit, 2);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"dc1_volt_offset\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"dc1_volt_offset\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print(c->dc1_volt_offset);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"dc2_volt_per_bit\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"dc2_volt_per_bit\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print((float)c->dc2_volt_per_bit, 2);
-  CONSOLE.println(F(","));
-
-  CONSOLE.print(F("\"dc2_volt_offset\": "));
+  CONSOLE.println(F("},"));
+  
+  CONSOLE.print(F("\"dc2_volt_offset\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print(c->dc2_volt_offset);
-
-
-  CONSOLE.println(F("}"));
+  CONSOLE.println(F("}}"));
 
 }
