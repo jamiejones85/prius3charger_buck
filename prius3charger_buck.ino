@@ -135,7 +135,7 @@ Connections:
 #define TEST_CONTACTORS false
 #define TEST_BOOST false
 #define TEST_BUCK false
-#define SKIP_CURRENT true
+#define SKIP_CURRENT false
 
 // Scaling of analog inputs
 // NOTE: DCBUS2 is buck high side = MG side = 3-phase AC input side
@@ -419,7 +419,7 @@ void setup()
 	// PWM generation.
 	Serial.begin(57600);
   
-	log_println_f("{DEBUG} prius3charger_buck");
+	log_println_f("-!- prius3charger_buck");
   chargerConfig = loadConfig();
 #if TEST_CONTACTORS == true
 	for(;;){
@@ -497,6 +497,7 @@ void calibrate_current_sensor_zero_offsets_if_needed()
 	}
 	mg2l1_current_raw_calibrated_zero = il1_1;
 	mg2l2_current_raw_calibrated_zero = il2_1;
+	log_print_timestamp();
 	Serial.print(F("{DEBUG} Calibrated zero offsets: IL1,2: "));
 	Serial.print(mg2l1_current_raw_calibrated_zero);
 	Serial.print(F(", "));
@@ -609,6 +610,7 @@ void charger_fail(ChargerFailReason fail_reason)
 	digitalWrite(AC_PRECHARGE_SWITCH_PIN, LOW);
 	digitalWrite(EVSE_SW_PIN, LOW);
 
+	log_print_timestamp();
 	CONSOLE.print("{ERROR} Charger failed: \"");
 	CONSOLE.print(ChargerFailReason_STRINGS[charger.fail_reason]);
 	CONSOLE.println("\"");
@@ -770,6 +772,7 @@ void handle_charger_state()
 
 			report_status_on_console();
 
+			log_print_timestamp();
 			CONSOLE.print(F("{DEBUG} Precharge starting at "));
 			CONSOLE.print(charger.precharge_last_input_voltage);
 			CONSOLE.println(" V");
@@ -817,12 +820,14 @@ void handle_charger_state()
 					abs(output_voltage_V - charger.precharge_last_battery_voltage) <= 2 &&
 					output_voltage_V >= (chargerConfig.battery_charge_voltage_V /2)
 				){
+					log_print_timestamp();
 					CONSOLE.print(F("{DEBUG} Battery side precharge looks FINISHED at "));
 					CONSOLE.print(output_voltage_V);
 					CONSOLE.println("V");
 
 					charger.battery_side_looks_precharged = true;
 				} else {
+					log_print_timestamp();
 					CONSOLE.print(F("{DEBUG} Battery side precharging at "));
 					CONSOLE.print(output_voltage_V);
 					CONSOLE.println("V");
@@ -1092,7 +1097,7 @@ void control_inductor_short_switch()
 		// short switch, and tell the programmer they messed up. You can look up
 		// if you find this in logs if your 3 phase breaker opened.
 		if(digitalRead(CONVERTER_SHORT_SWITCH_PIN)){
-			log_println_f("{ERROR} CONVERTER_SHORT_SWITCH was active while AC "
+			log_println_f("{ERRPR} CONVERTER_SHORT_SWITCH was active while AC "
 					"was active. The short switch has now been deactivated.");
 			digitalWrite(CONVERTER_SHORT_SWITCH_PIN, LOW);
 		}
@@ -1570,6 +1575,7 @@ void report_status_on_console()
 			abs(current_pwm - reported_current_pwm) > (accurate ? 1 : (PWM_MAX/100+1)) ||
 			console_report_all_values
 		){
+			log_print_timestamp();
       CONSOLE.print(F("{STATUS} "));
 			CONSOLE.print(F(">> PWM "));
 			CONSOLE.print((float)current_pwm / (float)(PWM_MAX / 100.0));
@@ -1642,22 +1648,20 @@ void handle_command(const char *command, size_t command_len)
 
  if(strncmp(command, "set ", 4) == 0){
     parseCommand(&command[4], &chargerConfig);
+    CONSOLE.println(F("{STARTCOMMAND}"));
     printChargerConfig(&chargerConfig);
-    CONSOLE.print(F("{COMMAND} Updated "));
-    CONSOLE.println(&command[4]);
-
+    CONSOLE.println(F("{ENDCOMMAND}"));
     return;
   }
   if(strcmp(command, "params") == 0 || strcmp(command, "p") == 0){
-    CONSOLE.println(F("{STARTCONFIG}"));
+    CONSOLE.println(F("{STARTCOMMAND}"));
     printChargerConfig(&chargerConfig);
-    CONSOLE.println(F("{ENDCONFIG}"));    
-    return;
+    CONSOLE.println(F("{ENDCOMMAND}"));    return;
   }
 
   if(strncmp(command, "save", 4) == 0){
     saveChargerConfig(chargerConfig);
-    CONSOLE.println(F("{COMMAND} Config Saved to EEPROM"));
+      CONSOLE.print(F("{COMMAND} Unknown command: "));
     return;
   }
 

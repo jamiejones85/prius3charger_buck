@@ -11,17 +11,22 @@
 #define DEFAULT_DCBUS1_V_PER_BIT 0.560
 #define DEFAULT_DCBUS2_OFFSET_BITS 0
 #define DEFAULT_DCBUS2_V_PER_BIT 1.234
+#define DEFAULT_INPUT_MINIMUM_VOLTAGE 300  
+#define CHECK_NUMBER 34 //check on loading EEPROM this value 
+
 
 typedef struct ChargerConfig {
-  volatile int16_t battery_charge_voltage_V;
-  volatile int16_t precharge_voltage_V;
-  volatile bool precharge_boost_enabled;
-  volatile bool canbus_enabled;
-  volatile float mg1_current_amp_per_bit;
-  volatile float dc1_volt_per_bit;
-  volatile int8_t dc1_volt_offset;
-  volatile float dc2_volt_per_bit;
-  volatile int8_t dc2_volt_offset;
+  int16_t battery_charge_voltage_V;
+  int16_t precharge_voltage_V;
+  int16_t min_input_voltage_V;
+  bool precharge_boost_enabled;
+  bool canbus_enabled;
+  float mg1_current_amp_per_bit;
+  float dc1_volt_per_bit;
+  int8_t dc1_volt_offset;
+  float dc2_volt_per_bit;
+  int8_t dc2_volt_offset;
+  int8_t check;
 };
 
 
@@ -30,26 +35,28 @@ ChargerConfig loadConfig() {
  
  EEPROM.get(0, c);
 
- if (c.battery_charge_voltage_V != 0) {
+ if (c.check == CHECK_NUMBER) {
   return c;
  }
 
  return ChargerConfig {
   DEFAULT_BATTERY_CHARGE_VOLTAGE,
   DEFAULT_PRECHARGE_VOLTAGE,
+  DEFAULT_INPUT_MINIMUM_VOLTAGE,
   DEFAULT_PRECHARGE_BOOST_ENABLED,
   DEFAULT_CANBUS_ENABLE,
   DEFAULT_MG1_CURRENT_A_PER_BIT,
   DEFAULT_DCBUS1_V_PER_BIT,
   DEFAULT_DCBUS1_OFFSET_BITS,
   DEFAULT_DCBUS2_V_PER_BIT,
-  DEFAULT_DCBUS2_OFFSET_BITS
+  DEFAULT_DCBUS2_OFFSET_BITS,
+  CHECK_NUMBER
  };
 }
 
 
 bool getBoolValue(char* value) {
-  if (strcmp(value, "true") || strcmp(value, "1")) {
+  if (strcmp(value, "true") == 0 || strcmp(value, "1") == 0) {
     return true;
   }
   return false;
@@ -57,7 +64,8 @@ bool getBoolValue(char* value) {
 
 
 ChargerConfig saveChargerConfig(ChargerConfig conf) {
-    EEPROM.put(0, conf);
+  
+    return EEPROM.put(0, conf);
 }
 
 void updateParameter(char* parameter, char* value, struct ChargerConfig* c) {
@@ -79,6 +87,8 @@ void updateParameter(char* parameter, char* value, struct ChargerConfig* c) {
     c->dc2_volt_offset = atoi(value);
   } else if (strcmp(parameter, "dc2_volt_per_bit") == 0) {
     c->dc2_volt_per_bit = atof(value);
+  } else if (strcmp(parameter, "min_input_voltage_V") == 0) {
+    c->min_input_voltage_V = atoi(value);
   }
 }
 
@@ -95,10 +105,14 @@ void parseCommand(char* command, struct ChargerConfig* c) {
 
 void printChargerConfig(struct ChargerConfig* c) {
   CONSOLE.println(F("{"));
+  CONSOLE.print(F("\"min_input_voltage_V\": { \"type\": \"number\", \"value\":"));
+  CONSOLE.print(c->min_input_voltage_V);
+  CONSOLE.println(F("},"));
+
   CONSOLE.print(F("\"battery_charge_voltage_V\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print(c->battery_charge_voltage_V);
   CONSOLE.println(F("},"));
-
+  
   CONSOLE.print(F("\"precharge_voltage_V\": { \"type\": \"number\", \"value\":"));
   CONSOLE.print(c->precharge_voltage_V);
   CONSOLE.println(F("},"));
