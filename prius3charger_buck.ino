@@ -1648,15 +1648,15 @@ void handle_command(const char *command, size_t command_len)
 
  if(strncmp(command, "set ", 4) == 0){
     parseCommand(&command[4], &chargerConfig);
-    CONSOLE.println(F("{STARTCOMMAND}"));
+    CONSOLE.println(F("{STARTCONFIG}"));
     printChargerConfig(&chargerConfig);
-    CONSOLE.println(F("{ENDCOMMAND}"));
+    CONSOLE.println(F("{STARTCONFIG}"));
     return;
   }
   if(strcmp(command, "params") == 0 || strcmp(command, "p") == 0){
-    CONSOLE.println(F("{STARTCOMMAND}"));
+    CONSOLE.println(F("{STARTCONFIG}"));
     printChargerConfig(&chargerConfig);
-    CONSOLE.println(F("{ENDCOMMAND}"));    return;
+    CONSOLE.println(F("{ENDCONFIG}"));    return;
   }
 
   if(strncmp(command, "save", 4) == 0){
